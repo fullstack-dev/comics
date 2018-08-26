@@ -16,6 +16,9 @@ export class DatabaseProvider {
 	private _DB     : any;
   private success : boolean = true;
 
+  private _remoteDB   : any;
+  private _syncOpts   : any;
+
   constructor(
   	public http: Http,
     public alertCtrl : AlertController
@@ -26,6 +29,69 @@ export class DatabaseProvider {
   initialiseDB()
   {
     this._DB = new PouchDB('comics');
+
+    this._remoteDB     = 'http://192.168.1.128:5984/comics';
+    this._syncOpts     = {  live         : true,
+                            retry        : true,
+                            continuous   : true };
+    this._DB.sync(this._remoteDB, this._syncOpts)
+    .on('change', (info) =>
+    {
+      console.log('Handling syncing change');
+      console.dir(info);
+    })
+    .on('paused', (info) =>
+    {
+      console.log('Handling syncing pause');
+      console.dir(info);
+    })
+    .on('active', (info) =>
+    {
+      console.log('Handling syncing resumption');
+      console.dir(info);
+    })
+    .on('denied', (err) =>
+    {
+      console.log('Handling syncing denied');
+      console.dir(err);
+    })
+    .on('complete', (info) =>
+    {
+      console.log('Handling syncing complete');
+      console.dir(info);
+    })
+    .on('error', (err)=>
+    {
+      console.log('Handling syncing error');
+      console.dir(err);
+    });
+  }
+
+  handleSyncing()
+  {
+    this._DB.changes({
+      since     : 'now',
+      live         : true,
+      include_docs   : true,
+      attachments   : true
+    })
+    .on('change', (change) =>
+    {
+      // handle change
+      console.log('Handling change');
+      console.dir(change);
+    })
+    .on('complete', (info) =>
+    {
+      // changes() was canceled
+      console.log('Changes complete');
+      console.dir(info);
+    })
+    .on('error',  (err) =>
+    {
+      console.log('Changes error');
+      console.log(err);
+    });
   }
 
   addComic(title, character, rating, note, image) {
@@ -51,7 +117,12 @@ export class DatabaseProvider {
         this.success = false;
      	});
 
-     	resolve(true);
+     	// resolve(true);
+      if(this.success)
+      {
+        this.handleSyncing();
+        resolve(true);
+      }
 
     });
   }
@@ -82,6 +153,7 @@ export class DatabaseProvider {
 
       if(this.success)
       {
+        this.handleSyncing();
         resolve(true);
       }
     });
